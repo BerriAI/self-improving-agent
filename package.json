@@ -1,14 +1,22 @@
 {
   "name": "self-improving-agent",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Drop-in self-improvement loop for any AI agent. Two tools + a skill. The agent proposes a diff, the human approves, a draft PR opens.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./claude": {
+      "types": "./dist/claude.d.ts",
+      "import": "./dist/claude.js"
+    },
+    "./pi": {
+      "types": "./dist/pi.d.ts",
+      "import": "./dist/pi.js"
     }
   },
   "files": [
@@ -46,8 +54,23 @@
   "engines": {
     "node": ">=18"
   },
+  "peerDependencies": {
+    "@anthropic-ai/claude-agent-sdk": ">=0.2.0",
+    "@mariozechner/pi-agent-core": ">=0.7.0",
+    "typebox": ">=1.0.0",
+    "zod": ">=4.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@anthropic-ai/claude-agent-sdk": { "optional": true },
+    "@mariozechner/pi-agent-core": { "optional": true },
+    "typebox": { "optional": true },
+    "zod": { "optional": true }
+  },
   "devDependencies": {
-    "typescript": "^5.5.0",
-    "@types/node": "^20.0.0"
+    "@anthropic-ai/claude-agent-sdk": "^0.2.128",
+    "@mariozechner/pi-agent-core": "^0.73.0",
+    "@types/node": "^20.0.0",
+    "typebox": "^1.1.37",
+    "typescript": "^5.5.0"
   }
 }

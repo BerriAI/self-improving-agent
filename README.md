@@ -25,91 +25,42 @@ flowchart LR
     D --> E([draft PR])
 ```
 
-The agent decides when to use these tools based on the skill — no regex on user messages, no transport assumptions.
+## Configure once, via env vars
 
-## Quick start
+```bash
+export SELF_IMPROVING_AGENT_REPO_ROOT=/abs/path/to/your/repo
+export SELF_IMPROVING_AGENT_PROPOSALS_DIR=./runs/improvements   # optional, this is the default
+```
 
-### With `@anthropic-ai/claude-agent-sdk`
+That's it — no options object, no per-call config.
+
+## Use it
+
+### Claude Agent SDK
 
 ```ts
-import { query, tool } from "@anthropic-ai/claude-agent-sdk";
-import { feedbackSkill, feedbackTools } from "self-improving-agent";
-
-const fb = feedbackTools({
-  repoRoot: process.cwd(),
-  proposalsDir: "./runs/improvements",
-  onProposed: async (p) => console.log(`[proposed] ${p.file} risk=${p.risk}`),
-  onApplied:  async (r) => console.log(`[applied]  ${r.prUrl}`),
-});
-
-const write = tool({
-  name: fb.writeImprovementProposal.name,
-  description: fb.writeImprovementProposal.description,
-  input_schema: fb.writeImprovementProposal.parameters,
-  handler: async (input) => (await fb.writeImprovementProposal.execute(input)).message,
-});
-
-const apply = tool({
-  name: fb.applyProposal.name,
-  description: fb.applyProposal.description,
-  input_schema: fb.applyProposal.parameters,
-  handler: async (input) => (await fb.applyProposal.execute(input)).message,
-});
+import { query } from "@anthropic-ai/claude-agent-sdk";
+import { feedbackServer, feedbackSkill } from "self-improving-agent/claude";
 
 for await (const _ of query({
-  prompt: "feedback: you skipped the env-vars step again",
+  prompt: userMessage,
   options: {
     systemPrompt: feedbackSkill,
-    tools: [write, apply],
-    model: "claude-sonnet-4-5",
+    mcpServers: { sia: feedbackServer },
   },
 })) { /* stream events */ }
 ```
 
-### With `@mariozechner/pi-agent-core`
+### pi-agent-core
 
 ```ts
-import { Agent, type AgentTool } from "@mariozechner/pi-agent-core";
-import { Type } from "typebox";
-import { feedbackSkill, feedbackTools } from "self-improving-agent";
+import { Agent } from "@mariozechner/pi-agent-core";
+import { feedbackTools, feedbackSkill } from "self-improving-agent/pi";
 
-const fb = feedbackTools({ repoRoot: process.cwd(), proposalsDir: "./runs/improvements" });
-
-const writeTool: AgentTool = {
-  name: fb.writeImprovementProposal.name,
-  label: "Write improvement proposal",
-  description: fb.writeImprovementProposal.description,
-  parameters: Type.Object({
-    file: Type.String(),
-    originalSnippet: Type.String(),
-    proposedSnippet: Type.String(),
-    reason: Type.String(),
-    risk: Type.Union([Type.Literal("low"), Type.Literal("medium"), Type.Literal("high")]),
-  }),
-  execute: async (_id, input) => {
-    const r = await fb.writeImprovementProposal.execute(input);
-    return { content: [{ type: "text", text: r.message }] };
-  },
-};
-
-const applyTool: AgentTool = {
-  name: fb.applyProposal.name,
-  label: "Apply proposal",
-  description: fb.applyProposal.description,
-  parameters: Type.Object({
-    proposalId: Type.String(),
-    userConfirmedInThisMessage: Type.Boolean(),
-  }),
-  execute: async (_id, input) => {
-    const r = await fb.applyProposal.execute(input);
-    return { content: [{ type: "text", text: r.message }], terminate: true };
-  },
-};
-
-const agent = new Agent({
+new Agent({
   initialState: {
     systemPrompt: `${myPrompt}\n\n${feedbackSkill}`,
-    tools: [writeTool, applyTool],
+    tools: [...myTools, ...feedbackTools],
     messages: [],
     model,
     thinkingLevel: "high",
@@ -119,32 +70,32 @@ const agent = new Agent({
 });
 ```
 
-Same pattern works with the OpenAI SDK, Vercel AI SDK, LangChain, raw `fetch` — anywhere you can pass a JSON-schema tool definition with an async executor.
-
-Full runnable versions: [`examples/claude-agent-sdk.ts`](examples/claude-agent-sdk.ts), [`examples/pi-agent-core.ts`](examples/pi-agent-core.ts).
-
-## API
+### Any other framework
 
 ```ts
-import { feedbackTools, feedbackSkill, type Proposal } from "self-improving-agent";
+import { feedbackTools, feedbackSkill } from "self-improving-agent";
+
+const fb = feedbackTools(); // returns { writeImprovementProposal, applyProposal }
+// each tool: { name, description, parameters (JSON Schema), execute(input): Promise<{ message }> }
 ```
 
-**`feedbackTools(opts)`** returns `{ writeImprovementProposal, applyProposal }`. Each tool exposes `{ name, description, parameters, execute }` — `parameters` is JSON Schema, `execute` is async.
+Pass `parameters` as the tool's input schema and `execute` as the handler. Works with the OpenAI SDK, Vercel AI SDK, LangChain, raw `fetch` — anything.
+
+## Callbacks (optional)
+
+For posting the diff or PR URL back to Slack/Discord/wherever:
 
 ```ts
-feedbackTools({
-  repoRoot: "/abs/path/to/repo",        // git working tree the agent edits
-  proposalsDir: "./runs/improvements",  // where proposal.json files live
-  onProposed?:    (proposal, result)  => void,  // post the diff somewhere
-  onApplied?:     (result, proposal)  => void,  // post the PR link
-  onBeforeApply?: (proposal, input, ctx) => boolean | void, // policy gate
+import { createFeedbackServer } from "self-improving-agent/claude";
+// or: import { createFeedbackTools } from "self-improving-agent/pi";
+
+const feedbackServer = createFeedbackServer({
+  onProposed: async (p, r) => slack.post(`Proposal ${r.proposalId} — risk: ${p.risk}`),
+  onApplied:  async (r) => slack.post(`PR opened: ${r.prUrl}`),
+  onBeforeApply: async (proposal, input, ctx) => {
+    if (!isApproval(ctx.lastUserMessage)) return false;
+  },
 });
-```
-
-**`feedbackSkill`** is a markdown string. Concat it into your system prompt:
-
-```ts
-const systemPrompt = `${myPrompt}\n\n${feedbackSkill}`;
 ```
 
 ## Safety
@@ -153,7 +104,7 @@ const systemPrompt = `${myPrompt}\n\n${feedbackSkill}`;
 
 1. **Skill wording** — model only calls `apply_proposal` after explicit approval in the user's *most recent* message.
 2. **Schema gate** — tool requires `userConfirmedInThisMessage: true`; executor throws on `false`.
-3. **`onBeforeApply` hook** — your code can reject any apply (rate limits, allowlist, push rights, etc).
+3. **`onBeforeApply` hook** — your code can reject any apply (rate limits, allowlist, push rights).
 
 `apply_proposal` also refuses to run if the working tree is dirty, the file is missing, or `originalSnippet` doesn't appear exactly once.
 
@@ -161,6 +112,7 @@ const systemPrompt = `${myPrompt}\n\n${feedbackSkill}`;
 
 - Node ≥ 18
 - `git` and `gh` (authenticated) on PATH
+- One of: `@anthropic-ai/claude-agent-sdk`, `@mariozechner/pi-agent-core`, or any agent framework that takes JSON-schema tools
 
 ## License
 

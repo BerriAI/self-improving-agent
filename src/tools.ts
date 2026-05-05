@@ -1,4 +1,5 @@
 import { applyProposal, type ApplyOptions, type ApplyResult } from "./apply.js";
+import { resolveConfig } from "./env.js";
 import {
   loadProposal,
   saveProposal,
@@ -86,10 +87,16 @@ export interface FeedbackToolsContext {
 }
 
 export interface FeedbackToolsOptions {
-  /** Absolute path to the git working tree this agent can modify. */
-  repoRoot: string;
-  /** Directory where proposal JSON files are persisted. */
-  proposalsDir: string;
+  /**
+   * Absolute path to the git working tree this agent can modify.
+   * Defaults to `SELF_IMPROVING_AGENT_REPO_ROOT` env var, then `process.cwd()`.
+   */
+  repoRoot?: string;
+  /**
+   * Directory where proposal JSON files are persisted.
+   * Defaults to `SELF_IMPROVING_AGENT_PROPOSALS_DIR` env var, then `./runs/improvements`.
+   */
+  proposalsDir?: string;
   /** Forwarded to `applyProposal` as PR/branch/commit defaults. */
   applyOptions?: Omit<ApplyOptions, "repoRoot">;
   /**
@@ -137,13 +144,16 @@ export interface FeedbackTool<I, O> {
  *
  * Adapt them to your framework's tool shape — see examples/.
  */
-export function feedbackTools(opts: FeedbackToolsOptions): {
+export function feedbackTools(opts: FeedbackToolsOptions = {}): {
   writeImprovementProposal: FeedbackTool<
     WriteImprovementProposalInput,
     WriteImprovementProposalResult
   >;
   applyProposal: FeedbackTool<ApplyProposalInput, ApplyProposalResult>;
 } {
+  // Resolve lazily inside each execute so env vars set after import still work.
+  const cfg = () => resolveConfig(opts);
+
   const writeImprovementProposal: FeedbackTool<
     WriteImprovementProposalInput,
     WriteImprovementProposalResult
@@ -154,7 +164,8 @@ export function feedbackTools(opts: FeedbackToolsOptions): {
       "Always preview the diff in chat first; never call apply_proposal in the same turn.",
     parameters: writeImprovementProposalSchema as unknown as object,
     execute: async (input) => {
-      const { proposalId, path } = saveProposal(input, opts.proposalsDir);
+      const { proposalsDir } = cfg();
+      const { proposalId, path } = saveProposal(input, proposalsDir);
       const result: WriteImprovementProposalResult = {
         proposalId,
         path,
@@ -180,7 +191,8 @@ export function feedbackTools(opts: FeedbackToolsOptions): {
           "apply_proposal requires userConfirmedInThisMessage=true. The user must explicitly approve."
         );
       }
-      const proposal = loadProposal(opts.proposalsDir, input.proposalId);
+      const { repoRoot, proposalsDir } = cfg();
+      const proposal = loadProposal(proposalsDir, input.proposalId);
       if (opts.onBeforeApply) {
         const ok = await opts.onBeforeApply(proposal, input, context ?? {});
         if (ok === false) {
@@ -188,7 +200,7 @@ export function feedbackTools(opts: FeedbackToolsOptions): {
         }
       }
       const applyResult = applyProposal(proposal, {
-        repoRoot: opts.repoRoot,
+        repoRoot,
         ...opts.applyOptions,
       });
       const result: ApplyProposalResult = {
