@@ -33,9 +33,12 @@
  * Config falls back to env vars (see ./env.ts). For callbacks, use
  * `createFeedbackTools({ onProposed, onApplied, onBeforeApply })`.
  */
-import { tool } from "@anthropic-ai/claude-agent-sdk";
+import { createSdkMcpServer, tool } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
 import { feedbackTools as buildFeedbackTools, type FeedbackToolsOptions } from "./tools.js";
+
+const SERVER_NAME = "self_improving_agent";
+const SERVER_VERSION = "0.4.2";
 
 const writeShape = {
   file: z.string().describe("Repo-relative path of the file to change."),
@@ -104,5 +107,45 @@ export function createFeedbackTools(opts: FeedbackToolsOptions = {}) {
  *   const sia = createSdkMcpServer({ name: "sia", tools: feedbackTools });
  */
 export const feedbackTools = createFeedbackTools();
+
+/**
+ * One-liner integration. Returns `{ mcpServers, allowedTools }` ready
+ * to spread into your `query({ options })`:
+ *
+ *   import { query } from "@anthropic-ai/claude-agent-sdk";
+ *   import { feedbackMcp } from "self-improving-agent/claude";
+ *
+ *   await query({ prompt, options: feedbackMcp() });
+ *
+ * If you already have your own `mcpServers` / `allowedTools`, merge:
+ *
+ *   const fb = feedbackMcp();
+ *   await query({
+ *     prompt,
+ *     options: {
+ *       mcpServers:  { ...myServers,  ...fb.mcpServers  },
+ *       allowedTools: [ ...myAllowed, ...fb.allowedTools ],
+ *     },
+ *   });
+ *
+ * The Claude SDK addresses custom tools as `mcp__{server}__{tool}`, so the
+ * MCP wrapping and tool-name prefixing are unavoidable — this helper just
+ * hides them.
+ */
+export function feedbackMcp(opts: FeedbackToolsOptions = {}) {
+  const tools = createFeedbackTools(opts);
+  const server = createSdkMcpServer({
+    name: SERVER_NAME,
+    version: SERVER_VERSION,
+    tools,
+  });
+  return {
+    mcpServers: { [SERVER_NAME]: server },
+    allowedTools: [
+      `mcp__${SERVER_NAME}__write_improvement_proposal`,
+      `mcp__${SERVER_NAME}__apply_proposal`,
+    ],
+  };
+}
 
 export { feedbackSkill } from "./skill.js";

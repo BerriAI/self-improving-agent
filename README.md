@@ -41,43 +41,29 @@ Both subpaths export the same thing: `feedbackTools`, an array of two tools shap
 
 ### Claude Agent SDK
 
-`feedbackTools` is a [`SdkMcpToolDefinition[]`](https://code.claude.com/docs/en/agent-sdk/custom-tools) — the same shape returned by the SDK's `tool()` helper. Drop them into your existing in-process tool bundle (or a fresh one) and add them to `allowedTools`:
+```ts
+import { query } from "@anthropic-ai/claude-agent-sdk";
+import { feedbackMcp } from "self-improving-agent/claude";
+
+await query({ prompt: userMessage, options: feedbackMcp() });
+```
+
+That's it. `feedbackMcp()` returns `{ mcpServers, allowedTools }` — spread it into `options` and the two tools are wired in.
+
+Already have your own tools? Merge:
 
 ```ts
-import { tool, createSdkMcpServer, query } from "@anthropic-ai/claude-agent-sdk";
-import { feedbackTools } from "self-improving-agent/claude";
-
-const myTools = [
-  tool("get_temperature", "...", { /* zod schema */ }, async (args) => ({ /* ... */ })),
-  // ...your other tools
-];
-
-const server = createSdkMcpServer({
-  name: "my-agent",
-  version: "1.0.0",
-  tools: [...myTools, ...feedbackTools],   // mix freely — same SdkMcpToolDefinition shape
-});
-
-for await (const _ of query({
+const fb = feedbackMcp();
+await query({
   prompt: userMessage,
   options: {
-    mcpServers: { "my-agent": server },
-    allowedTools: [
-      "mcp__my-agent__get_temperature",
-      "mcp__my-agent__write_improvement_proposal",
-      "mcp__my-agent__apply_proposal",
-    ],
+    mcpServers:  { ...myServers,  ...fb.mcpServers  },
+    allowedTools: [...myAllowed,  ...fb.allowedTools],
   },
-})) { /* stream events */ }
+});
 ```
 
-Custom tools in the Claude SDK run **in-process** — `createSdkMcpServer` is just a one-line bundler around `tool()` definitions. It doesn't spawn a subprocess and isn't connected to any external MCP. See the [official custom-tools guide](https://code.claude.com/docs/en/agent-sdk/custom-tools) for the full picture.
-
-If you don't have any other custom tools yet, the bundle is one line:
-
-```ts
-const server = createSdkMcpServer({ name: "sia", version: "0.1.0", tools: feedbackTools });
-```
+> Why the `mcpServers` field? The Claude SDK only exposes custom tools through its in-process `createSdkMcpServer` wrapper and addresses them as `mcp__{server}__{tool}` — that's a Claude SDK requirement, not an external MCP server. `feedbackMcp()` hides the boilerplate. ([custom tools docs](https://code.claude.com/docs/en/agent-sdk/custom-tools))
 
 ### pi-agent-core
 

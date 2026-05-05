@@ -1,6 +1,6 @@
 {
   "name": "self-improving-agent",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "Drop-in self-improvement loop for any AI agent. Two tools + a skill. The agent proposes a diff, the human approves, a draft PR opens.",
   "type": "module",
   "main": "./dist/index.js",
