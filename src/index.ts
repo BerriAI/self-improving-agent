@@ -12,12 +12,6 @@ export {
   type ApplyProposalResult,
 } from "./tools.js";
 export {
-  readSelfFile,
-  readSelfFileSchema,
-  type ReadSelfFileInput,
-  type ReadSelfFileResult,
-} from "./readTool.js";
-export {
   saveProposal,
   loadProposal,
   type Proposal,

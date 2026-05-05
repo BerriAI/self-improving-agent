@@ -11,11 +11,24 @@ export interface ResolvedConfig {
   proposalsDir: string;
 }
 
+let warnedAboutMissingRepoRoot = false;
+
 export function resolveConfig(opts?: Partial<ResolvedConfig>): ResolvedConfig {
-  const repoRoot =
-    opts?.repoRoot ??
-    process.env.SELF_IMPROVING_AGENT_REPO_ROOT ??
-    process.cwd();
+  const explicitRepoRoot =
+    opts?.repoRoot ?? process.env.SELF_IMPROVING_AGENT_REPO_ROOT;
+
+  if (!explicitRepoRoot && !warnedAboutMissingRepoRoot) {
+    warnedAboutMissingRepoRoot = true;
+    // eslint-disable-next-line no-console
+    console.warn(
+      "[self-improving-agent] SELF_IMPROVING_AGENT_REPO_ROOT is not set. " +
+        "Falling back to process.cwd() — but the agent won't be told where its " +
+        "own source lives. Set the env var to the absolute path of the repo " +
+        "whose prompts/code the agent should propose diffs for."
+    );
+  }
+
+  const repoRoot = explicitRepoRoot ?? process.cwd();
 
   const proposalsDir =
     opts?.proposalsDir ??
