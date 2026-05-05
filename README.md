@@ -52,19 +52,43 @@ Both subpaths export the same thing: `feedbackTools`, an array of two tools shap
 
 ### Claude Agent SDK
 
+`feedbackTools` is a [`SdkMcpToolDefinition[]`](https://code.claude.com/docs/en/agent-sdk/custom-tools) — the same shape returned by the SDK's `tool()` helper. Drop them into your existing in-process tool bundle (or a fresh one) and add them to `allowedTools`:
+
 ```ts
-import { createSdkMcpServer, query } from "@anthropic-ai/claude-agent-sdk";
+import { tool, createSdkMcpServer, query } from "@anthropic-ai/claude-agent-sdk";
 import { feedbackTools } from "self-improving-agent/claude";
 
-const sia = createSdkMcpServer({ name: "sia", version: "0.1.0", tools: feedbackTools });
+const myTools = [
+  tool("get_temperature", "...", { /* zod schema */ }, async (args) => ({ /* ... */ })),
+  // ...your other tools
+];
+
+const server = createSdkMcpServer({
+  name: "my-agent",
+  version: "1.0.0",
+  tools: [...myTools, ...feedbackTools],   // mix freely — same SdkMcpToolDefinition shape
+});
 
 for await (const _ of query({
   prompt: userMessage,
-  options: { mcpServers: { sia } },   // your existing systemPrompt stays as-is
+  options: {
+    mcpServers: { "my-agent": server },
+    allowedTools: [
+      "mcp__my-agent__get_temperature",
+      "mcp__my-agent__write_improvement_proposal",
+      "mcp__my-agent__apply_proposal",
+    ],
+  },
 })) { /* stream events */ }
 ```
 
-> The Claude SDK only accepts custom tools via MCP servers, so we wrap with `createSdkMcpServer`. One line.
+Custom tools in the Claude SDK run **in-process** — `createSdkMcpServer` is just a one-line bundler around `tool()` definitions. It doesn't spawn a subprocess and isn't connected to any external MCP. See the [official custom-tools guide](https://code.claude.com/docs/en/agent-sdk/custom-tools) for the full picture.
+
+If you don't have any other custom tools yet, the bundle is one line:
+
+```ts
+const server = createSdkMcpServer({ name: "sia", version: "0.1.0", tools: feedbackTools });
+```
 
 ### pi-agent-core
 

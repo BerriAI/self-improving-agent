@@ -1,17 +1,34 @@
 /**
- * Drop-in tools for the Claude Agent SDK (`@anthropic-ai/claude-agent-sdk`).
+ * Drop-in custom tools for the Claude Agent SDK
+ * (`@anthropic-ai/claude-agent-sdk`).
  *
- * Zero-config usage:
+ * `feedbackTools` is an array of `SdkMcpToolDefinition` objects — the exact
+ * shape returned by the SDK's `tool()` helper. They run in-process, just
+ * like any other custom tool you build. Mix them with your own tools and
+ * bundle once with `createSdkMcpServer`:
  *
- *   import { createSdkMcpServer, query } from "@anthropic-ai/claude-agent-sdk";
+ *   import { tool, createSdkMcpServer, query } from "@anthropic-ai/claude-agent-sdk";
  *   import { feedbackTools } from "self-improving-agent/claude";
  *
- *   const sia = createSdkMcpServer({ name: "sia", version: "0.1.0", tools: feedbackTools });
+ *   const server = createSdkMcpServer({
+ *     name: "my-agent",
+ *     version: "1.0.0",
+ *     tools: [...myTools, ...feedbackTools],
+ *   });
  *
  *   for await (const _ of query({
  *     prompt,
- *     options: { mcpServers: { sia } },   // your existing systemPrompt stays as-is
+ *     options: {
+ *       mcpServers: { "my-agent": server },
+ *       allowedTools: [
+ *         "mcp__my-agent__write_improvement_proposal",
+ *         "mcp__my-agent__apply_proposal",
+ *       ],
+ *     },
  *   })) { ... }
+ *
+ * See https://code.claude.com/docs/en/agent-sdk/custom-tools for the full
+ * custom-tool surface (it's all in-process — no external MCP).
  *
  * Config falls back to env vars (see ./env.ts). For callbacks, use
  * `createFeedbackTools({ onProposed, onApplied, onBeforeApply })`.
