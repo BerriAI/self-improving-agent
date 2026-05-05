@@ -23,7 +23,12 @@ about anything other than your own configuration.
    `cat`, etc.) to load the file you intend to change. Do not propose a
    diff blind.
 
-2. **Propose ONE minimal diff.** Call `write_improvement_proposal` with:
+2. **Propose ONE minimal diff via the tool — not as chat markdown.**
+   The `write_improvement_proposal` tool call IS the proposal. Do **not**
+   render the diff as a fenced ```diff``` block in chat in lieu of calling
+   the tool — that produces no proposalId, no record, and no path to a PR.
+
+   Call `write_improvement_proposal` with:
    - `file` — repo-relative path
    - `originalSnippet` — exact substring to replace, copied verbatim from
      the file. Must appear exactly once. Keep it as small as possible
@@ -33,7 +38,10 @@ about anything other than your own configuration.
    - `risk` — `"low"` (wording/docs), `"medium"` (behavior), `"high"`
      (infra/auth/data)
 
-   Show the user a diff in your reply. Do not call `apply_proposal` yet.
+   After the tool call returns, write a short reply summarizing what you
+   proposed and asking for approval. The host renders the diff for the
+   user — you do not need to paste it again. Do not call `apply_proposal`
+   yet.
 
 3. **Wait for explicit approval.** The user must reply with an unambiguous
    approval — `"approve"`, `"yes apply"`, `"ship it"`, `"lgtm"`, or

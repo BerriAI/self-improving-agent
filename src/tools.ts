@@ -170,7 +170,7 @@ export function feedbackTools(opts: FeedbackToolsOptions = {}): {
       "Workflow:\n" +
       "1. Read the file you intend to change first (don't propose blind).\n" +
       "2. Call this tool with ONE minimal diff: file path (repo-relative), exact originalSnippet (must appear exactly once — copy it verbatim from the file), proposedSnippet, reason, and risk.\n" +
-      "3. Show the user the diff in your reply.\n" +
+      "3. Write a short reply summarizing the proposal and asking for approval. Do NOT paste the diff as a fenced ```diff``` block in chat in lieu of calling this tool — the tool call IS the proposal; pasting markdown produces no proposalId, no record, and no path to a PR.\n" +
       "4. Wait for explicit approval (\"approve\", \"ship it\", \"lgtm\"). Only then call apply_proposal — never in the same turn as this call.\n\n" +
       "If the snippet appears more than once, expand originalSnippet until unique. One file per proposal — propose multi-file fixes sequentially.",
     parameters: writeImprovementProposalSchema as unknown as object,
