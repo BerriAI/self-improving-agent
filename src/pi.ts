@@ -28,6 +28,13 @@ import {
   type FeedbackToolsOptions,
 } from "./tools.js";
 
+const ReadParams = Type.Object({
+  path: Type.String({
+    description:
+      "Repo-relative path inside SELF_IMPROVING_AGENT_REPO_ROOT. Use \".\" to list the repo root.",
+  }),
+});
+
 const WriteParams = Type.Object({
   file: Type.String({ description: "Repo-relative path of the file to change." }),
   originalSnippet: Type.String({
@@ -64,6 +71,24 @@ const ApplyParams = Type.Object({
 export function createFeedbackTools(opts: FeedbackToolsOptions = {}): AgentTool[] {
   const fb = buildFeedbackTools(opts);
 
+  const readTool: AgentTool<typeof ReadParams> = {
+    name: fb.readSelfFile.name,
+    label: "Read self file",
+    description: fb.readSelfFile.description,
+    parameters: ReadParams,
+    execute: async (_id, input) => {
+      const r = await fb.readSelfFile.execute(input);
+      const text =
+        r.kind === "directory"
+          ? `${r.path}/\n${r.entries.map((e) => `  ${e}`).join("\n")}`
+          : `${r.path} (${r.bytes} bytes${r.truncated ? ", truncated" : ""}):\n${r.content}`;
+      return {
+        content: [{ type: "text" as const, text }],
+        details: { kind: r.kind, path: r.path },
+      };
+    },
+  };
+
   const writeTool: AgentTool<typeof WriteParams> = {
     name: fb.writeImprovementProposal.name,
     label: "Write improvement proposal",
@@ -93,7 +118,7 @@ export function createFeedbackTools(opts: FeedbackToolsOptions = {}): AgentTool[
     },
   };
 
-  return [writeTool as AgentTool, applyTool as AgentTool];
+  return [readTool as AgentTool, writeTool as AgentTool, applyTool as AgentTool];
 }
 
 /**

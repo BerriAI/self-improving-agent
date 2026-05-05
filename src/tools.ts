@@ -6,6 +6,12 @@ import {
   type Proposal,
   type SavedProposal,
 } from "./proposal.js";
+import {
+  readSelfFile,
+  readSelfFileSchema,
+  type ReadSelfFileInput,
+  type ReadSelfFileResult,
+} from "./readTool.js";
 
 /**
  * JSON Schema (draft-07 compatible) for `write_improvement_proposal`.
@@ -145,6 +151,7 @@ export interface FeedbackTool<I, O> {
  * Adapt them to your framework's tool shape — see examples/.
  */
 export function feedbackTools(opts: FeedbackToolsOptions = {}): {
+  readSelfFile: FeedbackTool<ReadSelfFileInput, ReadSelfFileResult>;
   writeImprovementProposal: FeedbackTool<
     WriteImprovementProposalInput,
     WriteImprovementProposalResult
@@ -154,6 +161,15 @@ export function feedbackTools(opts: FeedbackToolsOptions = {}): {
   // Resolve lazily inside each execute so env vars set after import still work.
   const cfg = () => resolveConfig(opts);
 
+  const readSelfFileTool: FeedbackTool<ReadSelfFileInput, ReadSelfFileResult> = {
+    name: "read_self_file",
+    description:
+      "Read a file (or list a directory) from your OWN source repo — the one that runs you. Use this before write_improvement_proposal so you can copy `originalSnippet` verbatim from the live file. " +
+      "Path is repo-relative; use \".\" to see the top of the tree. node_modules and dist are filtered out of directory listings.",
+    parameters: readSelfFileSchema as unknown as object,
+    execute: async (input) => readSelfFile(input),
+  };
+
   const writeImprovementProposal: FeedbackTool<
     WriteImprovementProposalInput,
     WriteImprovementProposalResult
@@ -162,8 +178,8 @@ export function feedbackTools(opts: FeedbackToolsOptions = {}): {
     description:
       "Use this when the user is critiquing YOU (your prompts, tools, skills, decisions) and asking you to fix yourself — e.g. \"you keep skipping the setup step\", \"your repro plan is too vague\", \"feedback: rewrite your prompt to handle X\". Do NOT use for normal product work or bug reports unrelated to your own configuration.\n\n" +
       "Workflow:\n" +
-      "1. Read the file you intend to change first (don't propose blind).\n" +
-      "2. Call this tool with ONE minimal diff: file path, exact originalSnippet (must appear exactly once), proposedSnippet, reason, and risk.\n" +
+      "1. Use `read_self_file` to inspect your own source — start with `read_self_file({path: \".\"})` to see the layout, then read the specific file you intend to change.\n" +
+      "2. Call this tool with ONE minimal diff: file path (repo-relative), exact originalSnippet (must appear exactly once — copy it verbatim from what `read_self_file` returned), proposedSnippet, reason, and risk.\n" +
       "3. Show the user the diff in your reply.\n" +
       "4. Wait for explicit approval (\"approve\", \"ship it\", \"lgtm\"). Only then call apply_proposal — never in the same turn as this call.\n\n" +
       "If the snippet appears more than once, expand originalSnippet until unique. One file per proposal — propose multi-file fixes sequentially.",
@@ -219,6 +235,7 @@ export function feedbackTools(opts: FeedbackToolsOptions = {}): {
   };
 
   return {
+    readSelfFile: readSelfFileTool,
     writeImprovementProposal,
     applyProposal: applyProposalTool,
   };

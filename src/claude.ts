@@ -20,6 +20,14 @@ import { tool } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
 import { feedbackTools as buildFeedbackTools, type FeedbackToolsOptions } from "./tools.js";
 
+const readShape = {
+  path: z
+    .string()
+    .describe(
+      "Repo-relative path inside SELF_IMPROVING_AGENT_REPO_ROOT. Use \".\" to list the repo root."
+    ),
+};
+
 const writeShape = {
   file: z.string().describe("Repo-relative path of the file to change."),
   originalSnippet: z
@@ -57,6 +65,20 @@ const applyShape = {
 export function createFeedbackTools(opts: FeedbackToolsOptions = {}) {
   const fb = buildFeedbackTools(opts);
 
+  const readTool = tool(
+    fb.readSelfFile.name,
+    fb.readSelfFile.description,
+    readShape,
+    async (args) => {
+      const result = await fb.readSelfFile.execute(args);
+      const text =
+        result.kind === "directory"
+          ? `${result.path}/\n${result.entries.map((e) => `  ${e}`).join("\n")}`
+          : `${result.path} (${result.bytes} bytes${result.truncated ? ", truncated" : ""}):\n${result.content}`;
+      return { content: [{ type: "text", text }] };
+    }
+  );
+
   const writeTool = tool(
     fb.writeImprovementProposal.name,
     fb.writeImprovementProposal.description,
@@ -77,7 +99,7 @@ export function createFeedbackTools(opts: FeedbackToolsOptions = {}) {
     }
   );
 
-  return [writeTool, applyTool];
+  return [readTool, writeTool, applyTool];
 }
 
 /**
