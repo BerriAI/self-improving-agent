@@ -8,8 +8,7 @@ Two tools. The agent proposes a minimal diff, you approve, a draft PR opens.
 npm install self-improving-agent
 ```
 
-<!-- Slack feedback → PR screenshot goes here -->
-<!-- ![Slack feedback to PR](docs/slack-to-pr.png) -->
+![Slack feedback → self-improving-agent → GitHub PR](assets/banner.png)
 
 ## For AI coding agents
 
