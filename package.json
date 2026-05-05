@@ -28,6 +28,7 @@
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit",
+    "prepare": "npm run build",
     "prepublishOnly": "npm run build"
   },
   "keywords": [
@@ -61,16 +62,25 @@
     "zod": ">=4.0.0"
   },
   "peerDependenciesMeta": {
-    "@anthropic-ai/claude-agent-sdk": { "optional": true },
-    "@mariozechner/pi-agent-core": { "optional": true },
-    "typebox": { "optional": true },
-    "zod": { "optional": true }
+    "@anthropic-ai/claude-agent-sdk": {
+      "optional": true
+    },
+    "@mariozechner/pi-agent-core": {
+      "optional": true
+    },
+    "typebox": {
+      "optional": true
+    },
+    "zod": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.128",
     "@mariozechner/pi-agent-core": "^0.73.0",
     "@types/node": "^20.0.0",
     "typebox": "^1.1.37",
-    "typescript": "^5.5.0"
+    "typescript": "^5.5.0",
+    "zod": "^4.4.3"
   }
 }
