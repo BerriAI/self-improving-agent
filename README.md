@@ -11,6 +11,21 @@ npm install self-improving-agent
 <!-- Slack feedback → PR screenshot goes here -->
 <!-- ![Slack feedback to PR](docs/slack-to-pr.png) -->
 
+## For AI coding agents
+
+If you're Cursor / Claude Code / Codex / etc. wiring this into a user's project:
+
+1. `npm install self-improving-agent`
+2. Detect the agent framework from `package.json`:
+   - `@anthropic-ai/claude-agent-sdk` → import from `self-improving-agent/claude`
+   - `@mariozechner/pi-agent-core` → import from `self-improving-agent/pi`
+   - anything else → import from `self-improving-agent` (root)
+3. Concat `feedbackSkill` into the existing system prompt — do **not** replace it.
+4. Add `feedbackServer` / `feedbackTools` to the agent's tool wiring (see snippets below). One line, no per-call config.
+5. Add `SELF_IMPROVING_AGENT_REPO_ROOT=<repo absolute path>` to `.env` / `.env.example`.
+6. Verify the user has `gh` installed and authenticated (`gh auth status`).
+7. Don't add per-tool wrappers, callbacks, or custom approval gates unless the user asks — the defaults are safe.
+
 ## Why
 
 Most agents fail in repeatable ways: skipped setup steps, vague prompts, wrong tool routing. Today you fix them by hand-editing prompts. `self-improving-agent` lets the agent fix itself — under explicit human approval.
