@@ -19,6 +19,9 @@ export {
 } from "./proposal.js";
 export {
   applyProposal,
+  ensureClone,
   type ApplyOptions,
   type ApplyResult,
 } from "./apply.js";
+export { resolveConfig } from "./env.js";
+export type { RepoRef, ResolvedConfig } from "./env.js";

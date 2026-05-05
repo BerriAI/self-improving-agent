@@ -41,12 +41,17 @@ function execGit(args: string[], cwd?: string): string {
 }
 
 /**
- * Run a git command with one-shot HTTP auth. The token rides in argv for
- * the lifetime of the call only — never persisted to `.git/config`.
+ * Run a git command with one-shot HTTP auth. Uses HTTP Basic with the
+ * `x-access-token` username convention so it works for both classic and
+ * fine-grained PATs. The token rides in argv for the lifetime of the
+ * call only — never persisted to `.git/config`.
  */
 function execGitWithAuth(args: string[], token: string, cwd?: string): string {
+  const basic = Buffer.from(`x-access-token:${token}`, "utf-8").toString(
+    "base64"
+  );
   return execGit(
-    ["-c", `http.extraheader=AUTHORIZATION: bearer ${token}`, ...args],
+    ["-c", `http.extraheader=AUTHORIZATION: Basic ${basic}`, ...args],
     cwd
   );
 }
