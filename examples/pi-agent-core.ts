@@ -1,20 +1,20 @@
 /**
- * pi-agent-core example. Two-line wiring.
+ * pi-agent-core example.
  *
  * Install:
  *   npm i @mariozechner/pi-agent-core @mariozechner/pi-ai typebox self-improving-agent
  */
 import { Agent } from "@mariozechner/pi-agent-core";
-import { feedbackSkill, feedbackTools } from "self-improving-agent/pi";
+import { feedbackTools } from "self-improving-agent/pi";
 
 export function buildAgent(systemPrompt: string, model: unknown, getApiKey: () => string) {
   return new Agent({
     initialState: {
-      systemPrompt: `${systemPrompt}\n\n${feedbackSkill}`,
+      systemPrompt, // unchanged — your own prompt
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       model: model as any,
       thinkingLevel: "high",
-      tools: [...feedbackTools],
+      tools: [...feedbackTools], // append the two feedback tools to your existing tools
       messages: [],
     },
     getApiKey,

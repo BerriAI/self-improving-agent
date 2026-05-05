@@ -160,8 +160,13 @@ export function feedbackTools(opts: FeedbackToolsOptions = {}): {
   > = {
     name: "write_improvement_proposal",
     description:
-      "Save a single minimal self-improvement diff (file + snippet replacement). " +
-      "Always preview the diff in chat first; never call apply_proposal in the same turn.",
+      "Use this when the user is critiquing YOU (your prompts, tools, skills, decisions) and asking you to fix yourself — e.g. \"you keep skipping the setup step\", \"your repro plan is too vague\", \"feedback: rewrite your prompt to handle X\". Do NOT use for normal product work or bug reports unrelated to your own configuration.\n\n" +
+      "Workflow:\n" +
+      "1. Read the file you intend to change first (don't propose blind).\n" +
+      "2. Call this tool with ONE minimal diff: file path, exact originalSnippet (must appear exactly once), proposedSnippet, reason, and risk.\n" +
+      "3. Show the user the diff in your reply.\n" +
+      "4. Wait for explicit approval (\"approve\", \"ship it\", \"lgtm\"). Only then call apply_proposal — never in the same turn as this call.\n\n" +
+      "If the snippet appears more than once, expand originalSnippet until unique. One file per proposal — propose multi-file fixes sequentially.",
     parameters: writeImprovementProposalSchema as unknown as object,
     execute: async (input) => {
       const { proposalsDir } = cfg();
@@ -181,9 +186,9 @@ export function feedbackTools(opts: FeedbackToolsOptions = {}): {
   const applyProposalTool: FeedbackTool<ApplyProposalInput, ApplyProposalResult> = {
     name: "apply_proposal",
     description:
-      "Apply a previously saved proposal: create a branch, commit the change, push, and open a draft PR. " +
-      "ONLY call this after the user has explicitly approved in their latest message. " +
-      "Pass userConfirmedInThisMessage: true to acknowledge the approval policy.",
+      "Apply a previously saved proposal: create a branch, commit the change, push, and open a draft PR.\n\n" +
+      "HARD RULE: Only call this if the user's MOST RECENT message is an unambiguous approval (\"approve\", \"yes apply\", \"ship it\", \"lgtm\"). If the latest message is anything else — a question, a tweak request, silence, ambiguity — do not call this tool, ask instead.\n\n" +
+      "Pass userConfirmedInThisMessage: true to acknowledge the approval policy. Setting it to true without explicit approval is a violation and will be rejected.",
     parameters: applyProposalSchema as unknown as object,
     execute: async (input, context) => {
       if (!input.userConfirmedInThisMessage) {

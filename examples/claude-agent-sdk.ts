@@ -1,5 +1,5 @@
 /**
- * Claude Agent SDK example. Two-line wiring.
+ * Claude Agent SDK example.
  *
  * Install:
  *   npm i @anthropic-ai/claude-agent-sdk self-improving-agent
@@ -8,16 +8,17 @@
  *   SELF_IMPROVING_AGENT_REPO_ROOT=$(pwd) \
  *   tsx examples/claude-agent-sdk.ts "feedback: you keep skipping the env-vars step"
  */
-import { query } from "@anthropic-ai/claude-agent-sdk";
-import { feedbackServer, feedbackSkill } from "self-improving-agent/claude";
+import { createSdkMcpServer, query } from "@anthropic-ai/claude-agent-sdk";
+import { feedbackTools } from "self-improving-agent/claude";
+
+const sia = createSdkMcpServer({ name: "sia", version: "0.1.0", tools: feedbackTools });
 
 const userMessage = process.argv.slice(2).join(" ") || "feedback: you keep skipping the env-vars step";
 
 for await (const event of query({
   prompt: userMessage,
   options: {
-    systemPrompt: feedbackSkill,
-    mcpServers: { sia: feedbackServer },
+    mcpServers: { sia },
     model: "claude-sonnet-4-5",
   },
 })) {

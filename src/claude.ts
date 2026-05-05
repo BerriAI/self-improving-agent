@@ -3,23 +3,22 @@
  *
  * Zero-config usage:
  *
- *   import { feedbackServer, feedbackSkill } from "self-improving-agent/claude";
- *   import { query } from "@anthropic-ai/claude-agent-sdk";
+ *   import { createSdkMcpServer, query } from "@anthropic-ai/claude-agent-sdk";
+ *   import { feedbackTools } from "self-improving-agent/claude";
+ *
+ *   const sia = createSdkMcpServer({ name: "sia", version: "0.1.0", tools: feedbackTools });
  *
  *   for await (const _ of query({
  *     prompt,
- *     options: {
- *       systemPrompt: feedbackSkill,
- *       mcpServers: { sia: feedbackServer },
- *     },
+ *     options: { mcpServers: { sia } },   // your existing systemPrompt stays as-is
  *   })) { ... }
  *
  * Config falls back to env vars (see ./env.ts). For callbacks, use
- * `createFeedbackServer({ onProposed, onApplied, onBeforeApply })`.
+ * `createFeedbackTools({ onProposed, onApplied, onBeforeApply })`.
  */
-import { createSdkMcpServer, tool } from "@anthropic-ai/claude-agent-sdk";
+import { tool } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
-import { feedbackTools, type FeedbackToolsOptions } from "./tools.js";
+import { feedbackTools as buildFeedbackTools, type FeedbackToolsOptions } from "./tools.js";
 
 const writeShape = {
   file: z.string().describe("Repo-relative path of the file to change."),
@@ -47,13 +46,16 @@ const applyShape = {
 };
 
 /**
- * Build a Claude SDK MCP server containing both feedback tools.
+ * Build the two feedback tools as `SdkMcpToolDefinition[]`.
  *
- * Use this when you need callbacks (`onProposed`, `onApplied`, `onBeforeApply`)
- * or want to override `repoRoot` / `proposalsDir` at construction time.
+ * Wrap with `createSdkMcpServer({ name, tools })` and pass the result into
+ * `query({ options: { mcpServers: { ... } } })`.
+ *
+ * Use this factory when you need callbacks (`onProposed`, `onApplied`,
+ * `onBeforeApply`) or want to override `repoRoot` / `proposalsDir`.
  */
-export function createFeedbackServer(opts: FeedbackToolsOptions = {}) {
-  const fb = feedbackTools(opts);
+export function createFeedbackTools(opts: FeedbackToolsOptions = {}) {
+  const fb = buildFeedbackTools(opts);
 
   const writeTool = tool(
     fb.writeImprovementProposal.name,
@@ -75,19 +77,15 @@ export function createFeedbackServer(opts: FeedbackToolsOptions = {}) {
     }
   );
 
-  return createSdkMcpServer({
-    name: "self-improving-agent",
-    version: "0.2.0",
-    tools: [writeTool, applyTool],
-  });
+  return [writeTool, applyTool];
 }
 
 /**
- * Zero-config feedback server. Reads `SELF_IMPROVING_AGENT_REPO_ROOT` and
+ * Zero-config tools array. Reads `SELF_IMPROVING_AGENT_REPO_ROOT` and
  * `SELF_IMPROVING_AGENT_PROPOSALS_DIR` from the environment at call time.
  *
- * Pass this directly into `query({ options: { mcpServers: { sia: feedbackServer } } })`.
+ *   const sia = createSdkMcpServer({ name: "sia", tools: feedbackTools });
  */
-export const feedbackServer = createFeedbackServer();
+export const feedbackTools = createFeedbackTools();
 
 export { feedbackSkill } from "./skill.js";
