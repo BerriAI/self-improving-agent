@@ -28,16 +28,6 @@ If you're Cursor / Claude Code / Codex / etc. wiring this into a user's project:
 
 Most agents fail in repeatable ways: skipped setup steps, vague prompts, wrong tool routing. Today you fix them by hand-editing prompts. `self-improving-agent` lets the agent fix itself — under explicit human approval.
 
-## How it works
-
-```mermaid
-flowchart LR
-    A([user feedback]) --> B[write_improvement_proposal]
-    B --> C{{diff shown}}
-    C -- "approve" --> D[apply_proposal]
-    D --> E([draft PR])
-```
-
 ## Configure once, via env vars
 
 ```bash
