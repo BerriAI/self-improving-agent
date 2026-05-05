@@ -38,7 +38,7 @@ import { z } from "zod";
 import { feedbackTools as buildFeedbackTools, type FeedbackToolsOptions } from "./tools.js";
 
 const SERVER_NAME = "self_improving_agent";
-const SERVER_VERSION = "0.4.2";
+const SERVER_VERSION = "0.5.0";
 
 const writeShape = {
   file: z.string().describe("Repo-relative path of the file to change."),

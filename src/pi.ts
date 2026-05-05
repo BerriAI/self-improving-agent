@@ -59,7 +59,7 @@ const ApplyParams = Type.Object({
  * Build the two pi-agent-core tools.
  *
  * Use this when you need callbacks (`onProposed`, `onApplied`, `onBeforeApply`)
- * or want to override `repoRoot` / `proposalsDir`.
+ * or want to override `repo` / `token` / `cacheDir` / `proposalsDir`.
  */
 export function createFeedbackTools(opts: FeedbackToolsOptions = {}): AgentTool[] {
   const fb = buildFeedbackTools(opts);
@@ -97,8 +97,10 @@ export function createFeedbackTools(opts: FeedbackToolsOptions = {}): AgentTool[
 }
 
 /**
- * Zero-config tool array. Reads `SELF_IMPROVING_AGENT_REPO_ROOT` and
- * `SELF_IMPROVING_AGENT_PROPOSALS_DIR` from the environment at call time.
+ * Zero-config tool array. Reads `SELF_IMPROVING_AGENT_REPO`,
+ * `SELF_IMPROVING_AGENT_GITHUB_TOKEN`, and (optionally)
+ * `SELF_IMPROVING_AGENT_CACHE_DIR` / `SELF_IMPROVING_AGENT_PROPOSALS_DIR`
+ * from the environment at call time.
  *
  * Spread directly into `tools: [...feedbackTools]` in your Agent state.
  */

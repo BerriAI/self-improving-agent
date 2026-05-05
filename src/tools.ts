@@ -1,5 +1,5 @@
-import { applyProposal, type ApplyOptions, type ApplyResult } from "./apply.js";
-import { resolveConfig } from "./env.js";
+import { applyProposal, ensureClone, type ApplyOptions, type ApplyResult } from "./apply.js";
+import { resolveConfig, type PartialConfigOpts } from "./env.js";
 import {
   loadProposal,
   saveProposal,
@@ -86,19 +86,9 @@ export interface FeedbackToolsContext {
   lastUserMessage?: string;
 }
 
-export interface FeedbackToolsOptions {
-  /**
-   * Absolute path to the git working tree this agent can modify.
-   * Defaults to `SELF_IMPROVING_AGENT_REPO_ROOT` env var, then `process.cwd()`.
-   */
-  repoRoot?: string;
-  /**
-   * Directory where proposal JSON files are persisted.
-   * Defaults to `SELF_IMPROVING_AGENT_PROPOSALS_DIR` env var, then `./runs/improvements`.
-   */
-  proposalsDir?: string;
+export interface FeedbackToolsOptions extends PartialConfigOpts {
   /** Forwarded to `applyProposal` as PR/branch/commit defaults. */
-  applyOptions?: Omit<ApplyOptions, "repoRoot">;
+  applyOptions?: Omit<ApplyOptions, "repo" | "token" | "cacheDir" | "baseBranch">;
   /**
    * Optional gate. Throw or return `false` to reject `apply_proposal`.
    * Receives the loaded proposal and the agent-supplied input. Use this
@@ -126,6 +116,12 @@ export interface FeedbackToolsOptions {
     proposal: SavedProposal,
     result: WriteImprovementProposalResult
   ) => void | Promise<void>;
+  /**
+   * If true (default), kick off a background clone/refresh of the cache
+   * when `feedbackTools()` is called so the agent's source is on disk
+   * by the time it reads files. Set false to defer until first apply.
+   */
+  prefetch?: boolean;
 }
 
 /** Generic tool definition. Adapt to your framework. */
@@ -151,12 +147,30 @@ export function feedbackTools(opts: FeedbackToolsOptions = {}): {
   >;
   applyProposal: FeedbackTool<ApplyProposalInput, ApplyProposalResult>;
 } {
-  // Resolve lazily inside each execute so env vars set after import still work.
-  const cfg = () => resolveConfig(opts);
-  // Resolve once at construction so we can bake the repo root into the
-  // tool description — the agent needs to know where its own source
-  // lives (the host's read/shell tools may be sandboxed elsewhere).
-  const constructionRepoRoot = resolveConfig(opts).repoRoot;
+  // Lenient resolution at construction so we can bake the cache path /
+  // repo into the tool description without crashing if env vars are
+  // missing — `apply_proposal` re-resolves strictly at execute time.
+  const constructionCfg = resolveConfig({ ...opts, lenient: true });
+
+  // Kick off the clone in the background so the agent can read source
+  // files via shell `cat` / a read tool before its first tool call.
+  // We swallow errors here — they'll resurface clearly on apply.
+  if (opts.prefetch !== false && constructionCfg.token) {
+    queueMicrotask(() => {
+      try {
+        ensureClone({
+          repo: constructionCfg.repo,
+          token: constructionCfg.token,
+          cacheDir: constructionCfg.cacheDir,
+          baseBranch: constructionCfg.baseBranch,
+        });
+      } catch {
+        // Logged on apply if it fails again.
+      }
+    });
+  }
+
+  const repoSlug = `${constructionCfg.repo.owner}/${constructionCfg.repo.name}`;
 
   const writeImprovementProposal: FeedbackTool<
     WriteImprovementProposalInput,
@@ -165,8 +179,8 @@ export function feedbackTools(opts: FeedbackToolsOptions = {}): {
     name: "write_improvement_proposal",
     description:
       "Use this when the user is critiquing YOU (your prompts, tools, skills, decisions) and asking you to fix yourself — e.g. \"you keep skipping the setup step\", \"your repro plan is too vague\", \"feedback: rewrite your prompt to handle X\". Do NOT use for normal product work or bug reports unrelated to your own configuration.\n\n" +
-      `YOUR OWN SOURCE CODE lives at: ${constructionRepoRoot}\n` +
-      "Use whatever read tool you have (shell with `cat`/`grep`, a file-reading tool, GitHub MCP, etc.) to inspect that path — it may differ from any sandboxed working tree your other tools default to. The `file` argument below is repo-relative to that path.\n\n" +
+      `YOUR OWN SOURCE CODE for the GitHub repo ${repoSlug} is checked out at:\n  ${constructionCfg.cacheDir}\n` +
+      "This is a working clone the lib keeps fresh on the base branch — read from it with whatever read tool you have (shell with `cat`/`grep`, a file-reading tool, etc.). The `file` argument below is repo-relative to that path. If the directory doesn't exist yet (first run), the lib will clone it on `apply_proposal`; you can also fetch the file via the GitHub API for `" + repoSlug + "` if you don't want to wait.\n\n" +
       "Workflow:\n" +
       "1. Read the file you intend to change first (don't propose blind).\n" +
       "2. Call this tool with ONE minimal diff: file path (repo-relative), exact originalSnippet (must appear exactly once — copy it verbatim from the file), proposedSnippet, reason, and risk.\n" +
@@ -175,7 +189,7 @@ export function feedbackTools(opts: FeedbackToolsOptions = {}): {
       "If the snippet appears more than once, expand originalSnippet until unique. One file per proposal — propose multi-file fixes sequentially.",
     parameters: writeImprovementProposalSchema as unknown as object,
     execute: async (input) => {
-      const { proposalsDir } = cfg();
+      const { proposalsDir } = resolveConfig({ ...opts, lenient: true });
       const { proposalId, path } = saveProposal(input, proposalsDir);
       const result: WriteImprovementProposalResult = {
         proposalId,
@@ -192,7 +206,7 @@ export function feedbackTools(opts: FeedbackToolsOptions = {}): {
   const applyProposalTool: FeedbackTool<ApplyProposalInput, ApplyProposalResult> = {
     name: "apply_proposal",
     description:
-      "Apply a previously saved proposal: create a branch, commit the change, push, and open a draft PR.\n\n" +
+      `Apply a previously saved proposal against ${repoSlug}: create a branch, commit, push using the configured PAT, and open a draft PR via the GitHub REST API.\n\n` +
       "HARD RULE: Only call this if the user's MOST RECENT message is an unambiguous approval (\"approve\", \"yes apply\", \"ship it\", \"lgtm\"). If the latest message is anything else — a question, a tweak request, silence, ambiguity — do not call this tool, ask instead.\n\n" +
       "Pass userConfirmedInThisMessage: true to acknowledge the approval policy. Setting it to true without explicit approval is a violation and will be rejected.",
     parameters: applyProposalSchema as unknown as object,
@@ -202,16 +216,19 @@ export function feedbackTools(opts: FeedbackToolsOptions = {}): {
           "apply_proposal requires userConfirmedInThisMessage=true. The user must explicitly approve."
         );
       }
-      const { repoRoot, proposalsDir } = cfg();
-      const proposal = loadProposal(proposalsDir, input.proposalId);
+      const cfg = resolveConfig(opts);
+      const proposal = loadProposal(cfg.proposalsDir, input.proposalId);
       if (opts.onBeforeApply) {
         const ok = await opts.onBeforeApply(proposal, input, context ?? {});
         if (ok === false) {
           throw new Error("apply_proposal rejected by onBeforeApply policy.");
         }
       }
-      const applyResult = applyProposal(proposal, {
-        repoRoot,
+      const applyResult = await applyProposal(proposal, {
+        repo: cfg.repo,
+        token: cfg.token,
+        cacheDir: cfg.cacheDir,
+        baseBranch: cfg.baseBranch,
         ...opts.applyOptions,
       });
       const result: ApplyProposalResult = {

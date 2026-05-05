@@ -20,9 +20,10 @@ If you're Cursor / Claude Code / Codex / etc. wiring this into a user's project:
    - `@mariozechner/pi-agent-core` → import from `self-improving-agent/pi`
    - anything else → import from `self-improving-agent` (root)
 3. Add the two tools to the agent's existing tool list. **Do not touch the user's system prompt.** The safety/workflow rules are baked into the tool descriptions.
-4. Add `SELF_IMPROVING_AGENT_REPO_ROOT=<repo absolute path>` to `.env` / `.env.example`.
-5. Verify the user has `gh` installed and authenticated (`gh auth status`).
-6. Don't add callbacks or custom approval gates unless the user asks — the defaults are safe.
+4. Add these two env vars to `.env` / `.env.example`:
+   - `SELF_IMPROVING_AGENT_REPO=<owner>/<name>` — e.g. `BerriAI/shin-builder-oss`
+   - `SELF_IMPROVING_AGENT_GITHUB_TOKEN=<PAT>` — fine-grained PAT with `contents: write` + `pull requests: write` on that repo
+5. Don't add callbacks or custom approval gates unless the user asks — the defaults are safe.
 
 ## Why
 
@@ -31,9 +32,19 @@ Most agents fail in repeatable ways: skipped setup steps, vague prompts, wrong t
 ## Configure once, via env vars
 
 ```bash
-export SELF_IMPROVING_AGENT_REPO_ROOT=/abs/path/to/your/repo
-export SELF_IMPROVING_AGENT_PROPOSALS_DIR=./runs/improvements   # optional, this is the default
+# Required
+export SELF_IMPROVING_AGENT_REPO=BerriAI/shin-builder-oss
+export SELF_IMPROVING_AGENT_GITHUB_TOKEN=ghp_xxxxxxxxxxxxx
+
+# Optional
+export SELF_IMPROVING_AGENT_BASE_BRANCH=main                          # default: main
+export SELF_IMPROVING_AGENT_PROPOSALS_DIR=./runs/improvements         # default: ./runs/improvements
+export SELF_IMPROVING_AGENT_CACHE_DIR=~/.cache/self-improving-agent/… # default: derived from repo
 ```
+
+The token must be a [fine-grained PAT](https://github.com/settings/tokens?type=beta) with **Contents: Read & write** and **Pull requests: Read & write** on the configured repo.
+
+The lib clones the repo into `cacheDir` on first use and keeps it on the base branch — no local clone or `gh` CLI required. Push and PR creation go through the GitHub REST API with the token.
 
 ## Use it
 
@@ -126,18 +137,20 @@ const tools = createFeedbackTools({
 
 ## Safety
 
-`apply_proposal` pushes a branch and opens a PR. Three layers of defense:
+`apply_proposal` pushes a branch and opens a PR. Four layers of defense:
 
 1. **Tool description** — model is told to only call `apply_proposal` after explicit approval in the user's *most recent* message.
 2. **Schema gate** — tool requires `userConfirmedInThisMessage: true`; executor throws on `false`.
-3. **`onBeforeApply` hook** — your code can reject any apply (rate limits, allowlist, push rights).
+3. **`onBeforeApply` hook** — your code can reject any apply (rate limits, allowlist, custom intent matching).
+4. **PAT scope** — the token's GitHub permissions cap blast radius. Use a fine-grained PAT pinned to one repo with only `contents:write` + `pull_requests:write`.
 
-`apply_proposal` also refuses to run if the working tree is dirty, the file is missing, or `originalSnippet` doesn't appear exactly once.
+`apply_proposal` also refuses to run if the file is missing in the cloned repo or if `originalSnippet` doesn't appear exactly once. The token rides in argv only for the duration of clone/push — never persisted to `.git/config`.
 
 ## Requirements
 
 - Node ≥ 18
-- `git` and `gh` (authenticated) on PATH
+- `git` on PATH (no `gh` CLI needed)
+- A GitHub fine-grained PAT scoped to the target repo
 - One of: `@anthropic-ai/claude-agent-sdk`, `@mariozechner/pi-agent-core`, or any agent framework that takes JSON-schema tools
 
 ## License

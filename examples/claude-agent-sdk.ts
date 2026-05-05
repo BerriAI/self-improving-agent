@@ -5,20 +5,21 @@
  *   npm i @anthropic-ai/claude-agent-sdk self-improving-agent
  *
  * Run:
- *   SELF_IMPROVING_AGENT_REPO_ROOT=$(pwd) \
+ *   SELF_IMPROVING_AGENT_REPO=BerriAI/your-repo \
+ *   SELF_IMPROVING_AGENT_GITHUB_TOKEN=ghp_xxx \
  *   tsx examples/claude-agent-sdk.ts "feedback: you keep skipping the env-vars step"
  */
-import { createSdkMcpServer, query } from "@anthropic-ai/claude-agent-sdk";
-import { feedbackTools } from "self-improving-agent/claude";
+import { query } from "@anthropic-ai/claude-agent-sdk";
+import { feedbackMcp } from "self-improving-agent/claude";
 
-const sia = createSdkMcpServer({ name: "sia", version: "0.1.0", tools: feedbackTools });
-
-const userMessage = process.argv.slice(2).join(" ") || "feedback: you keep skipping the env-vars step";
+const userMessage =
+  process.argv.slice(2).join(" ") ||
+  "feedback: you keep skipping the env-vars step";
 
 for await (const event of query({
   prompt: userMessage,
   options: {
-    mcpServers: { sia },
+    ...feedbackMcp(),
     model: "claude-sonnet-4-5",
   },
 })) {
