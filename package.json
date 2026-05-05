@@ -1,0 +1,53 @@
+{
+  "name": "self-improving-agent",
+  "version": "0.1.0",
+  "description": "Drop-in self-improvement loop for any AI agent. Two tools + a skill. The agent proposes a diff, the human approves, a draft PR opens.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "skills",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "ai",
+    "agent",
+    "self-improving",
+    "feedback",
+    "llm",
+    "tool",
+    "github",
+    "pr",
+    "skill"
+  ],
+  "author": "BerriAI",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/BerriAI/self-improving-agent.git"
+  },
+  "homepage": "https://github.com/BerriAI/self-improving-agent#readme",
+  "bugs": {
+    "url": "https://github.com/BerriAI/self-improving-agent/issues"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0",
+    "@types/node": "^20.0.0"
+  }
+}
